@@ -25,10 +25,13 @@ fn main() {
         for i in 0..num_player {
             println!("{}", &game.token_string());
             println!("Played: {}", &game.played_string());
-            print_hands(&players, num_player, &i);
+            print_hands(&players, &i, &game.show_negative);
             print_discards(&game);
             parse_command(&mut players, &mut game, &i);
             print!("\x1B[2J\x1B[1;1H");
+            if game.ended {
+                break;
+            }
         }
     }
 }
@@ -73,10 +76,20 @@ fn get_perfection() -> bool {
     }
 }
 
-fn print_hands(players: &HashMap<usize, Player>, num_players: usize, cur_player: &usize) {
-    let index_vec = (0..num_players).collect::<Vec<usize>>();
+fn print_hands(players: &HashMap<usize, Player>, cur_player: &usize, negative: &bool) {
+    let index_vec = (0..players.len()).collect::<Vec<usize>>();
     println!("Your hand (Player {}):", cur_player);
     println!("\t{}", players[&cur_player].get_hand_string());
+    if *negative {
+        let out = players[&cur_player].get_negative_numbers();
+        if out.trim() != "" {
+            println!("\t{}", out);
+        }
+        let out = players[&cur_player].get_negative_colors();
+        if out.trim() != "" {
+            println!("\t{}", out);
+        }
+    }
     println!("");
 
     for sec in index_vec.split(|x| x == cur_player).rev() {
@@ -85,6 +98,17 @@ fn print_hands(players: &HashMap<usize, Player>, num_players: usize, cur_player:
             println!("\t{}", players[&i].peak_hand_string());
             println!("\t{}", players[&i].get_hand_string());
             println!("");
+            if *negative {
+                let out = players[&i].get_negative_numbers();
+                if out.trim() != "" {
+                    println!("\t{}", out);
+                }
+                let out = players[&i].get_negative_colors();
+                if out.trim() != "" {
+                    println!("\t{}", out);
+                }
+                println!("");
+            };
         }
     }
 }
@@ -108,6 +132,15 @@ fn parse_command(players: &mut HashMap<usize, Player>, game: &mut Game, current_
                 game.end_game("Quit by player");
                 Some(0)
             }
+            "n" => {
+                game.show_negative = !game.show_negative;
+                print!("\x1B[2J\x1B[1;1H");
+                println!("{}", &game.token_string());
+                println!("Played: {}", &game.played_string());
+                print_hands(&players, current_player, &game.show_negative);
+                print_discards(&game);
+                None
+            }
             _ => None,
         };
 
@@ -115,7 +148,8 @@ fn parse_command(players: &mut HashMap<usize, Player>, game: &mut Game, current_
             Some(x) => break,
             None => (),
         }
-        if parts[0] != "?" {
+
+        if parts[0].trim() != "?" && parts[0].trim() != "n" {
             println!("Invalid command: {}", input);
             println!("Enter ? for help");
         }
@@ -129,6 +163,7 @@ fn print_help() -> Option<usize> {
     println!("\t Each color should be the first letter, lower case (g,b,y,w,r)");
     println!("'p <i>' : Play card at index <i> in hand");
     println!("'d <i>' : Discard card at index <i> in hand");
+    println!("'n' : toggle negative information below hands");
     println!("'q' : End game.");
     println!("");
     println!("Discards will be displayed below hands, underlines mean that card is at risk");

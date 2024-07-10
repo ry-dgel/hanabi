@@ -10,13 +10,15 @@ use rand::thread_rng;
 struct Secret<T> {
     value: T,
     known: bool,
+    negative: Vec<T>,
 }
 
-impl<T: PartialEq> Secret<T> {
+impl<T: PartialEq + Clone + Ord> Secret<T> {
     fn new(value: T) -> Self {
         return Secret {
             value,
             known: false,
+            negative: Vec::<T>::new(),
         };
     }
 
@@ -35,15 +37,24 @@ impl<T: PartialEq> Secret<T> {
     fn reveal_if(&mut self, value: &T) -> () {
         if &self.value == value {
             self.reveal()
+        } else {
+            if !self.negative.contains(value) {
+                self.negative.push(value.clone());
+                self.negative.sort();
+            }
         }
     }
 
     fn peek(&self) -> &T {
         return &self.value;
     }
+
+    fn get_negative(&self) -> &Vec<T> {
+        return &self.negative;
+    }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub enum Color {
     Red,
     Blue,
@@ -176,6 +187,7 @@ pub struct Game {
     discard_limits: HashMap<Color, HashMap<usize, usize>>,
     perfection: bool,
     pub ended: bool,
+    pub show_negative: bool,
 }
 
 fn init_discard_limits() -> HashMap<Color, HashMap<usize, usize>> {
@@ -206,6 +218,7 @@ impl Game {
         let discarded = HashMap::<Color, HashMap<usize, usize>>::new();
         let discard_limits = init_discard_limits();
         let ended = false;
+        let show_negative = false;
 
         Game {
             deck,
@@ -217,6 +230,7 @@ impl Game {
             discard_limits,
             perfection,
             ended,
+            show_negative,
         }
     }
     fn play(&mut self, card: Card) -> bool {
@@ -388,20 +402,25 @@ impl Player {
     }
 
     pub fn get_hand_string(&self) -> String {
-        self.hand
-            .iter()
-            .map(|card| card.to_string())
-            .intersperse(" ".to_string())
-            .collect()
+        format!(
+            "  {}",
+            self.hand
+                .iter()
+                .map(|card| card.to_string())
+                .intersperse("     ".to_string())
+                .collect::<String>()
+        )
     }
 
     pub fn peak_hand_string(&self) -> String {
-        self.hand
-            .iter()
-            .map(|card| card.cheat_string())
-            .intersperse(" ".to_string())
-            .collect::<Vec<String>>()
-            .join("")
+        format!(
+            "  {}",
+            self.hand
+                .iter()
+                .map(|card| card.cheat_string())
+                .intersperse("     ".to_string())
+                .collect::<String>()
+        )
     }
 
     pub fn get_color_hint(&mut self, color: Color) {
@@ -414,5 +433,43 @@ impl Player {
         self.hand
             .iter_mut()
             .for_each(|card| card.hint_number(&number));
+    }
+
+    pub fn get_negative_colors(&self) -> String {
+        let mut output = String::new();
+        let colors = vec![
+            (Color::Green, "G".green()),
+            (Color::Blue, "B".blue()),
+            (Color::Yellow, "Y".yellow()),
+            (Color::White, "W".white()),
+            (Color::Red, "R".red()),
+        ];
+        for card in &self.hand {
+            for (color, label) in &colors {
+                if card.color.negative.contains(color) {
+                    output = format!("{}{}", output, label);
+                } else {
+                    output = format!("{} ", output);
+                }
+            }
+            output = format!("{} ", output);
+        }
+        output
+    }
+
+    pub fn get_negative_numbers(&self) -> String {
+        let mut output = String::new();
+        let numbers = vec![1, 2, 3, 4, 5];
+        for card in &self.hand {
+            for number in &numbers {
+                if card.number.negative.contains(number) {
+                    output = format!("{}{}", output, number.to_string().cyan());
+                } else {
+                    output = format!("{} ", output);
+                }
+            }
+            output = format!("{} ", output);
+        }
+        output
     }
 }
